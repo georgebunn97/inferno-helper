@@ -43,8 +43,8 @@ public class InfernoOverlay extends Overlay
     private final InfernoConfig config;
     private final Client client;
 
-    // Draggable position for the prayer helper
-    private Point prayerHelperPosition = new Point(550, 100);
+    // Draggable position for the prayer helper - positioned between minimap and inventory
+    private Point prayerHelperPosition = new Point(550, 350);
     private boolean isDragging = false;
     private Point dragStart = null;
     private static final int LINE_HEIGHT = 30;
@@ -525,14 +525,15 @@ public class InfernoOverlay extends Overlay
             timeSinceLastTick = 0;
         }
 
-        // Draw the prayer helper box at the draggable position
-        graphics.setColor(new Color(0, 0, 0, 200));
+        // Draw the prayer helper box at the draggable position with a more visible background
+        graphics.setColor(new Color(0, 0, 0, 150)); // More transparent black
         graphics.fillRect(prayerHelperPosition.getX(), prayerHelperPosition.getY(), 200, 150);
         graphics.setColor(Color.WHITE);
         graphics.drawRect(prayerHelperPosition.getX(), prayerHelperPosition.getY(), 200, 150);
 
-        // Draw title
+        // Draw title with a more visible font
         graphics.setFont(new Font("Arial", Font.BOLD, 14));
+        graphics.setColor(Color.WHITE);
         graphics.drawString("Prayer Helper", prayerHelperPosition.getX() + BOX_PADDING, prayerHelperPosition.getY() + 20);
 
         // Draw three lines for each prayer type
@@ -540,17 +541,17 @@ public class InfernoOverlay extends Overlay
         int rangeY = prayerHelperPosition.getY() + 70;
         int magicY = prayerHelperPosition.getY() + 100;
 
-        // Draw line headers
+        // Draw line headers with brighter colors
         graphics.setFont(new Font("Arial", Font.BOLD, 12));
-        graphics.setColor(Color.RED);
+        graphics.setColor(new Color(255, 100, 100)); // Brighter red
         graphics.drawString("MELEE", prayerHelperPosition.getX() + BOX_PADDING, meleeY);
-        graphics.setColor(Color.GREEN);
+        graphics.setColor(new Color(100, 255, 100)); // Brighter green
         graphics.drawString("RANGE", prayerHelperPosition.getX() + BOX_PADDING, rangeY);
-        graphics.setColor(Color.BLUE);
+        graphics.setColor(new Color(100, 100, 255)); // Brighter blue
         graphics.drawString("MAGIC", prayerHelperPosition.getX() + BOX_PADDING, magicY);
 
-        // Draw lines
-        graphics.setColor(new Color(50, 50, 50, 150));
+        // Draw lines with a more visible color
+        graphics.setColor(new Color(200, 200, 200, 200)); // Lighter gray
         graphics.drawLine(prayerHelperPosition.getX() + BOX_PADDING, meleeY + 5,
                 prayerHelperPosition.getX() + 190, meleeY + 5);
         graphics.drawLine(prayerHelperPosition.getX() + BOX_PADDING, rangeY + 5,
