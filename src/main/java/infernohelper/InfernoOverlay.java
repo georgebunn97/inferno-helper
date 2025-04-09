@@ -23,6 +23,7 @@ import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetID;
+import net.runelite.api.widgets.WidgetInfo;
 import infernohelper.InfernoPrayerDisplayMode;
 import infernohelper.InfernoSafespotDisplayMode;
 import net.runelite.client.ui.overlay.Overlay;
@@ -38,6 +39,11 @@ public class InfernoOverlay extends Overlay
     private static final int TICK_PIXEL_SIZE = 60;
     private static final int BOX_WIDTH = 10;
     private static final int BOX_HEIGHT = 5;
+
+    // Add prayer widget child IDs
+    private static final int PROTECT_FROM_MAGIC = 21;
+    private static final int PROTECT_FROM_MISSILES = 22;
+    private static final int PROTECT_FROM_MELEE = 23;
 
     private final InfernoPlugin plugin;
     private final InfernoConfig config;
@@ -64,9 +70,13 @@ public class InfernoOverlay extends Overlay
     @Override
     public Dimension render(Graphics2D graphics)
     {
-        final Widget meleePrayerWidget = client.getWidget(WidgetID.PRAYER_GROUP_ID, 12); // Protect from Melee
-        final Widget rangePrayerWidget = client.getWidget(WidgetID.PRAYER_GROUP_ID, 11); // Protect from Missiles
-        final Widget magicPrayerWidget = client.getWidget(WidgetID.PRAYER_GROUP_ID, 10); // Protect from Magic
+        // Get the prayer tab widget
+        Widget prayerTab = client.getWidget(WidgetID.PRAYER_GROUP_ID, 0);
+
+        // Get the individual prayer widgets using group ID and child IDs
+        Widget meleePrayerWidget = client.getWidget(WidgetID.PRAYER_GROUP_ID, PROTECT_FROM_MELEE);
+        Widget rangePrayerWidget = client.getWidget(WidgetID.PRAYER_GROUP_ID, PROTECT_FROM_MISSILES);
+        Widget magicPrayerWidget = client.getWidget(WidgetID.PRAYER_GROUP_ID, PROTECT_FROM_MAGIC);
 
         if (config.indicateObstacles())
         {
@@ -151,12 +161,8 @@ public class InfernoOverlay extends Overlay
             }
         }
 
-        boolean prayerWidgetHidden = meleePrayerWidget == null
-                || rangePrayerWidget == null
-                || magicPrayerWidget == null
-                || (meleePrayerWidget != null && meleePrayerWidget.isHidden())
-                || (rangePrayerWidget != null && rangePrayerWidget.isHidden())
-                || (magicPrayerWidget != null && magicPrayerWidget.isHidden());
+        boolean prayerWidgetHidden = prayerTab == null || prayerTab.isHidden() ||
+                meleePrayerWidget == null || rangePrayerWidget == null || magicPrayerWidget == null;
 
         if ((config.prayerDisplayMode() == InfernoPrayerDisplayMode.PRAYER_TAB
                 || config.prayerDisplayMode() == InfernoPrayerDisplayMode.BOTH)
@@ -513,64 +519,12 @@ public class InfernoOverlay extends Overlay
 
     private void renderDescendingBoxes(Graphics2D graphics)
     {
-        if (plugin == null || plugin.getUpcomingAttacks() == null || plugin.getUpcomingAttacks().isEmpty())
-        {
-            return;
-        }
-
-        // Calculate time since last tick for smooth animation
-        long timeSinceLastTick = System.currentTimeMillis() - plugin.getLastTick();
-        if (timeSinceLastTick > 600) // If more than a tick has passed, reset
-        {
-            timeSinceLastTick = 0;
-        }
-
-        // Draw the prayer helper box at the draggable position with a more visible background
-        graphics.setColor(new Color(0, 0, 0, 150)); // More transparent black
-        graphics.fillRect(prayerHelperPosition.getX(), prayerHelperPosition.getY(), 200, 150);
-        graphics.setColor(Color.WHITE);
-        graphics.drawRect(prayerHelperPosition.getX(), prayerHelperPosition.getY(), 200, 150);
-
-        // Draw title with a more visible font
-        graphics.setFont(new Font("Arial", Font.BOLD, 14));
-        graphics.setColor(Color.WHITE);
-        graphics.drawString("Prayer Helper", prayerHelperPosition.getX() + BOX_PADDING, prayerHelperPosition.getY() + 20);
-
-        // Draw three lines for each prayer type
-        int meleeY = prayerHelperPosition.getY() + 40;
-        int rangeY = prayerHelperPosition.getY() + 70;
-        int magicY = prayerHelperPosition.getY() + 100;
-
-        // Draw line headers with brighter colors
-        graphics.setFont(new Font("Arial", Font.BOLD, 12));
-        graphics.setColor(new Color(255, 100, 100)); // Brighter red
-        graphics.drawString("MELEE", prayerHelperPosition.getX() + BOX_PADDING, meleeY);
-        graphics.setColor(new Color(100, 255, 100)); // Brighter green
-        graphics.drawString("RANGE", prayerHelperPosition.getX() + BOX_PADDING, rangeY);
-        graphics.setColor(new Color(100, 100, 255)); // Brighter blue
-        graphics.drawString("MAGIC", prayerHelperPosition.getX() + BOX_PADDING, magicY);
-
-        // Draw lines with a more visible color
-        graphics.setColor(new Color(200, 200, 200, 200)); // Lighter gray
-        graphics.drawLine(prayerHelperPosition.getX() + BOX_PADDING, meleeY + 5,
-                prayerHelperPosition.getX() + 190, meleeY + 5);
-        graphics.drawLine(prayerHelperPosition.getX() + BOX_PADDING, rangeY + 5,
-                prayerHelperPosition.getX() + 190, rangeY + 5);
-        graphics.drawLine(prayerHelperPosition.getX() + BOX_PADDING, magicY + 5,
-                prayerHelperPosition.getX() + 190, magicY + 5);
-
-        // Process each upcoming attack
         for (Integer tick : plugin.getUpcomingAttacks().keySet())
         {
             final Map<InfernoNPC.Attack, Integer> attackPriority = plugin.getUpcomingAttacks().get(tick);
-            if (attackPriority == null || attackPriority.isEmpty())
-            {
-                continue;
-            }
-
-            // Find the best attack for this tick
             int bestPriority = 999;
             InfernoNPC.Attack bestAttack = null;
+
             for (Map.Entry<InfernoNPC.Attack, Integer> attackEntry : attackPriority.entrySet())
             {
                 if (attackEntry.getValue() < bestPriority)
@@ -580,134 +534,48 @@ public class InfernoOverlay extends Overlay
                 }
             }
 
-            // Render boxes for each attack
             for (InfernoNPC.Attack currentAttack : attackPriority.keySet())
             {
-                if (currentAttack == null || currentAttack.getPrayer() == null)
+                final Color color = (tick == 1 && currentAttack == bestAttack) ? Color.RED : Color.ORANGE;
+
+                // Get the correct widget based on the attack type
+                Widget prayerWidget = null;
+                switch (currentAttack) {
+                    case MELEE:
+                        prayerWidget = client.getWidget(WidgetID.PRAYER_GROUP_ID, PROTECT_FROM_MELEE);
+                        break;
+                    case RANGED:
+                        prayerWidget = client.getWidget(WidgetID.PRAYER_GROUP_ID, PROTECT_FROM_MISSILES);
+                        break;
+                    case MAGIC:
+                        prayerWidget = client.getWidget(WidgetID.PRAYER_GROUP_ID, PROTECT_FROM_MAGIC);
+                        break;
+                }
+
+                if (prayerWidget == null)
                 {
                     continue;
                 }
 
-                // Determine which line to use based on prayer type
-                int lineY = 0;
-                Color boxColor = Color.WHITE;
-                switch (currentAttack.getPrayer())
+                int baseX = (int) prayerWidget.getBounds().getX();
+                baseX += prayerWidget.getBounds().getWidth() / 2;
+                baseX -= BOX_WIDTH / 2;
+
+                int baseY = (int) prayerWidget.getBounds().getY() - tick * TICK_PIXEL_SIZE - BOX_HEIGHT;
+                baseY += TICK_PIXEL_SIZE - ((plugin.getLastTick() + 600 - System.currentTimeMillis()) / 600.0 * TICK_PIXEL_SIZE);
+
+                final Rectangle boxRectangle = new Rectangle(BOX_WIDTH, BOX_HEIGHT);
+                boxRectangle.translate(baseX, baseY);
+
+                if (currentAttack == bestAttack)
                 {
-                    case PROTECT_FROM_MELEE:
-                        lineY = meleeY;
-                        boxColor = Color.RED;
-                        break;
-                    case PROTECT_FROM_MISSILES:
-                        lineY = rangeY;
-                        boxColor = Color.GREEN;
-                        break;
-                    case PROTECT_FROM_MAGIC:
-                        lineY = magicY;
-                        boxColor = Color.BLUE;
-                        break;
-                    default:
-                        continue;
-                }
-
-                // Calculate box position - now cascading downward
-                int boxPosX = prayerHelperPosition.getX() + BOX_PADDING + 50;
-                // Start from the top and move down based on tick
-                int boxPosY = lineY - 10 - (tick - 1) * 5;
-                // Add animation offset
-                boxPosY += ((timeSinceLastTick) / 600.0 * 5);
-
-                // Create and position the box
-                final Rectangle boxRectangle = new Rectangle(10, 10);
-                boxRectangle.translate(boxPosX, boxPosY);
-
-                // Make the best attack more prominent
-                if (tick == 1 && currentAttack == bestAttack)
-                {
-                    boxColor = boxColor.brighter();
-                    renderFilledPolygon(graphics, boxRectangle, boxColor);
-
-                    // Add a tick indicator for the current tick
-                    graphics.setFont(new Font("Arial", Font.BOLD, 10));
-                    graphics.setColor(Color.WHITE);
-                    graphics.drawString("NOW", boxPosX + 15, boxPosY + 8);
+                    renderFilledPolygon(graphics, boxRectangle, color);
                 }
                 else if (config.indicateNonPriorityDescendingBoxes())
                 {
-                    renderOutlinePolygon(graphics, boxRectangle, boxColor);
-
-                    // Add tick number
-                    graphics.setFont(new Font("Arial", Font.PLAIN, 8));
-                    graphics.setColor(Color.WHITE);
-                    graphics.drawString("T" + tick, boxPosX + 15, boxPosY + 8);
+                    renderOutlinePolygon(graphics, boxRectangle, color);
                 }
             }
-        }
-    }
-
-    private void renderPrayerIconOverlay(Graphics2D graphics)
-    {
-        if (plugin == null || plugin.getClosestAttack() == null)
-        {
-            return;
-        }
-
-        // Prayer indicator in prayer tab
-        InfernoNPC.Attack prayerForAttack = null;
-        if (client.isPrayerActive(Prayer.PROTECT_FROM_MAGIC))
-        {
-            prayerForAttack = InfernoNPC.Attack.MAGIC;
-        }
-        else if (client.isPrayerActive(Prayer.PROTECT_FROM_MISSILES))
-        {
-            prayerForAttack = InfernoNPC.Attack.RANGED;
-        }
-        else if (client.isPrayerActive(Prayer.PROTECT_FROM_MELEE))
-        {
-            prayerForAttack = InfernoNPC.Attack.MELEE;
-        }
-
-        if (plugin.getClosestAttack() != prayerForAttack || config.indicateWhenPrayingCorrectly())
-        {
-            if (plugin.getClosestAttack().getPrayer() == null)
-            {
-                return;
-            }
-
-            final Widget prayerWidget = client.getWidget(WidgetID.PRAYER_GROUP_ID, getPrayerWidgetId(plugin.getClosestAttack().getPrayer()));
-            if (prayerWidget == null || prayerWidget.getBounds() == null)
-            {
-                return;
-            }
-
-            final Rectangle prayerRectangle = new Rectangle((int) prayerWidget.getBounds().getWidth(),
-                    (int) prayerWidget.getBounds().getHeight());
-            prayerRectangle.translate((int) prayerWidget.getBounds().getX(), (int) prayerWidget.getBounds().getY());
-
-            //TODO: Config values for these colors
-            Color prayerColor;
-            if (plugin.getClosestAttack() == prayerForAttack)
-            {
-                prayerColor = Color.GREEN;
-            }
-            else
-            {
-                prayerColor = Color.RED;
-            }
-
-            renderOutlinePolygon(graphics, prayerRectangle, prayerColor);
-        }
-    }
-
-    private static int getPrayerWidgetId(Prayer prayer) {
-        switch (prayer) {
-            case PROTECT_FROM_MELEE:
-                return 12;
-            case PROTECT_FROM_MISSILES:
-                return 11;
-            case PROTECT_FROM_MAGIC:
-                return 10;
-            default:
-                return -1;
         }
     }
 
@@ -801,5 +669,65 @@ public class InfernoOverlay extends Overlay
             }
             renderTextLocation(graphics, canvasCenterPoint, txtString, fontColor);
         }
+    }
+
+    private void renderPrayerIconOverlay(Graphics2D graphics)
+    {
+        if (plugin.getUpcomingAttacks().isEmpty())
+        {
+            return;
+        }
+
+        // Get the next attack that's coming
+        Map<InfernoNPC.Attack, Integer> attackPriority = plugin.getUpcomingAttacks().get(1);
+        if (attackPriority == null)
+        {
+            return;
+        }
+
+        // Find the highest priority attack
+        InfernoNPC.Attack bestAttack = null;
+        int bestPriority = 999;
+
+        for (Map.Entry<InfernoNPC.Attack, Integer> attackEntry : attackPriority.entrySet())
+        {
+            if (attackEntry.getValue() < bestPriority)
+            {
+                bestAttack = attackEntry.getKey();
+                bestPriority = attackEntry.getValue();
+            }
+        }
+
+        if (bestAttack == null)
+        {
+            return;
+        }
+
+        // Get the prayer widget for the best attack
+        Widget prayerWidget = null;
+        switch (bestAttack) {
+            case MELEE:
+                prayerWidget = client.getWidget(WidgetID.PRAYER_GROUP_ID, PROTECT_FROM_MELEE);
+                break;
+            case RANGED:
+                prayerWidget = client.getWidget(WidgetID.PRAYER_GROUP_ID, PROTECT_FROM_MISSILES);
+                break;
+            case MAGIC:
+                prayerWidget = client.getWidget(WidgetID.PRAYER_GROUP_ID, PROTECT_FROM_MAGIC);
+                break;
+        }
+
+        if (prayerWidget == null)
+        {
+            return;
+        }
+
+        // Draw a highlight around the prayer that should be active
+        Rectangle bounds = prayerWidget.getBounds();
+        // Use red for immediate/critical attacks, orange for normal attacks
+        Color color = (bestPriority == 1) ? Color.RED : Color.ORANGE;
+        graphics.setColor(color);
+        graphics.setStroke(new BasicStroke(2));
+        graphics.draw(bounds);
     }
 }
